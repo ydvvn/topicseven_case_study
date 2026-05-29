@@ -29,24 +29,6 @@ public class Controller {
 
 
     @FXML
-    public void switchToMainApp(ActionEvent event) {
-        try {
-
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/example/topic7/hello-view.fxml"));
-
-            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-
-            Scene scene = new Scene(loader.load());
-            stage.setScene(scene);
-            stage.setTitle("Student Record Management System - Dashboard");
-            stage.show();
-        } catch (IOException e) {
-            System.err.println("Could not load hello-view.fxml. Checking spelling and path.");
-            e.printStackTrace();
-        }
-    }
-
-    @FXML
     public void initialize() {
         conn = DBConnection.connect();
 
