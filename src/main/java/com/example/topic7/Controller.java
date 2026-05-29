@@ -1,14 +1,9 @@
 package com.example.topic7;
 
 import javafx.collections.*;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.stage.Stage;
-import java.io.IOException;
+
 import java.sql.*;
 
 public class Controller {
@@ -27,71 +22,43 @@ public class Controller {
     private Connection conn;
     private int selectedId = -1;
 
-
-    @FXML
-    public void switchToMainApp(ActionEvent event) {
-        try {
-
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/example/topic7/hello-view.fxml"));
-
-            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
-
-            Scene scene = new Scene(loader.load());
-            stage.setScene(scene);
-            stage.setTitle("Student Record Management System - Dashboard");
-            stage.show();
-        } catch (IOException e) {
-            System.err.println("Could not load hello-view.fxml. Checking spelling and path.");
-            e.printStackTrace();
-        }
-    }
-
     @FXML
     public void initialize() {
         conn = DBConnection.connect();
 
+        // Load Enum to ChoiceBox
+        cbYear.getItems().setAll(YearLevel.values());
 
-        if (cbYear != null) {
-            cbYear.getItems().setAll(YearLevel.values());
-        }
+        // Table Columns Binding
+        colId.setCellValueFactory(data -> data.getValue().idProperty().asObject());
+        colName.setCellValueFactory(data -> data.getValue().nameProperty());
+        colCourse.setCellValueFactory(data -> data.getValue().courseProperty());
+        colYear.setCellValueFactory(data -> data.getValue().yearLevelProperty());
 
-        if (table != null) {
-            colId.setCellValueFactory(data -> data.getValue().idProperty().asObject());
-            colName.setCellValueFactory(data -> data.getValue().nameProperty());
-            colCourse.setCellValueFactory(data -> data.getValue().courseProperty());
-            colYear.setCellValueFactory(data -> data.getValue().yearLevelProperty());
+        loadData();
 
-            if (conn != null) {
-                loadData();
-            }
+        // Row click event
+        table.setOnMouseClicked(e -> {
+            Student s = table.getSelectionModel().getSelectedItem();
+            if (s != null) {
+                selectedId = s.getId();
+                txtName.setText(s.getName());
+                txtCourse.setText(s.getCourse());
 
-            // Row click event
-            table.setOnMouseClicked(e -> {
-                Student s = table.getSelectionModel().getSelectedItem();
-                if (s != null) {
-                    selectedId = s.getId();
-
-                    // Extra safe guard in case text fields are separated later
-                    if (txtName != null) txtName.setText(s.getName());
-                    if (txtCourse != null) txtCourse.setText(s.getCourse());
-
-                    if (cbYear != null) {
-                        for (YearLevel y : YearLevel.values()) {
-                            if (y.toString().equals(s.getYearLevel())) {
-                                cbYear.setValue(y);
-                            }
-                        }
+                // Convert String back to Enum
+                for (YearLevel y : YearLevel.values()) {
+                    if (y.toString().equals(s.getYearLevel())) {
+                        cbYear.setValue(y);
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     private void loadData() {
-        if (conn == null) return;
         list.clear();
         try {
-            String query = "SELECT * FROM students ORDER BY id ASC";
+            String query = "SELECT * FROM students";
             ResultSet rs = conn.createStatement().executeQuery(query);
 
             while (rs.next()) {
@@ -109,15 +76,44 @@ public class Controller {
         }
     }
 
+    private boolean isInputValid() {
+        String errorMessage = "";
+
+        if (txtName.getText() == null || txtName.getText().trim().isEmpty()) {
+            errorMessage += "Name field cannot be empty.\n";
+        }
+        if (txtCourse.getText() == null || txtCourse.getText().trim().isEmpty()) {
+            errorMessage += "Course field cannot be empty.\n";
+        }
+        if (cbYear.getValue() == null) {
+            errorMessage += "Please select a Year Level.\n";
+        }
+
+        if (errorMessage.isEmpty()) {
+            return true;
+        } else {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Validation Error!");
+            alert.setHeaderText("Missing Form Inputs");
+            alert.setContentText(errorMessage);
+            alert.showAndWait();
+            return false;
+        }
+    }
+
     @FXML
-    private void addStudent() {
-        if (validateInputs()) return;
+    public void addStudent() {
+        // Validate inputs first
+        if (!isInputValid()) {
+            return;
+        }
+
         try {
             String query = "INSERT INTO students(name, course, year_level) VALUES (?, ?, ?)";
             PreparedStatement pst = conn.prepareStatement(query);
 
-            pst.setString(1, txtName.getText());
-            pst.setString(2, txtCourse.getText());
+            pst.setString(1, txtName.getText().trim());
+            pst.setString(2, txtCourse.getText().trim());
             pst.setString(3, cbYear.getValue().toString());
 
             pst.executeUpdate();
@@ -130,14 +126,28 @@ public class Controller {
     }
 
     @FXML
-    private void updateStudent() {
-        if (selectedId == -1 || validateInputs()) return;
+    public void updateStudent() {
+
+        if (selectedId == -1) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Error!");
+            alert.setHeaderText(null);
+            alert.setContentText("Select a student from the table first to update.");
+            alert.showAndWait();
+            return;
+        }
+
+        // Validate text field states
+        if (!isInputValid()) {
+            return;
+        }
+
         try {
             String query = "UPDATE students SET name=?, course=?, year_level=? WHERE id=?";
             PreparedStatement pst = conn.prepareStatement(query);
 
-            pst.setString(1, txtName.getText());
-            pst.setString(2, txtCourse.getText());
+            pst.setString(1, txtName.getText().trim());
+            pst.setString(2, txtCourse.getText().trim());
             pst.setString(3, cbYear.getValue().toString());
             pst.setInt(4, selectedId);
 
@@ -151,8 +161,7 @@ public class Controller {
     }
 
     @FXML
-    private void deleteStudent() {
-        if (selectedId == -1) return;
+    public void deleteStudent() {
         try {
             String query = "DELETE FROM students WHERE id=?";
             PreparedStatement pst = conn.prepareStatement(query);
@@ -169,21 +178,12 @@ public class Controller {
     }
 
     @FXML
-    private void clearFields() {
-        if (txtName != null) txtName.clear();
-        if (txtCourse != null) txtCourse.clear();
-        if (cbYear != null) cbYear.setValue(null);
+    public void clearFields() {
+        txtName.clear();
+        txtCourse.clear();
+        cbYear.setValue(null);
         selectedId = -1;
     }
-
-    // to prevent adding empty SQL records
-    private boolean validateInputs() {
-        if (txtName == null || txtCourse == null || cbYear == null) return false;
-        if (txtName.getText().trim().isEmpty() || txtCourse.getText().trim().isEmpty() || cbYear.getValue() == null) {
-            Alert alert = new Alert(Alert.AlertType.WARNING, "All fields are required!", ButtonType.OK);
-            alert.showAndWait();
-            return true;
-        }
-        return false;
-    }
 }
+
+
